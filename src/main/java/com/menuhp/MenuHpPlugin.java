@@ -10,15 +10,18 @@ import net.runelite.api.NPC;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.Text;
+import net.runelite.client.util.WildcardMatcher;
 import org.apache.commons.lang3.ArrayUtils;
 
 import javax.inject.Inject;
 import java.awt.*;
-import java.util.Set;
+import java.util.*;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,6 +48,9 @@ public class MenuHpPlugin extends Plugin
 
 	private static final Pattern COLOR_TAG_PATTERN = Pattern.compile("<col=([a-zA-Z0-9]+)>");
 
+	private List<String> npcNames;
+	private Map<NPC, Double> npcRatios;
+
 	@Provides
 	private MenuHpConfig provideConfig(ConfigManager configManager)
 	{
@@ -54,14 +60,25 @@ public class MenuHpPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-
+		npcNames = Text.fromCSV(config.npcsToShow());
+		npcRatios = new LinkedHashMap<>();
 	}
 
 	@Override
 	protected void shutDown() throws Exception
 	{
-
+	    npcRatios = null;
 	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (event.getGroup().equals("menuhp"))
+		{
+			npcNames = Text.fromCSV(config.npcsToShow());
+		}
+	}
+
 
 	@Subscribe
 	public void onMenuEntryAdded(MenuEntryAdded event)
@@ -78,56 +95,72 @@ public class MenuHpPlugin extends Plugin
 		if (NPC_MENU_ACTIONS.contains(menuAction))
 		{
 			NPC npc = client.getCachedNPCs()[event.getIdentifier()];
-			String finalText = null;
 
-			if (!npc.isDead() && npc.getHealthRatio() > 0)
+			if ((config.showOnAllNpcs() || shouldShowNpc(npc)))
 			{
-				String target = event.getTarget();
+                String target = event.getTarget();
+                String cleanTarget = Text.removeTags(event.getTarget());
+                int levelStartIndex = cleanTarget.lastIndexOf('(');
+                String levelText = levelStartIndex != -1 ? cleanTarget.substring(levelStartIndex) : "";
 
-				String cleanTarget = Text.removeTags(event.getTarget());
-				int levelStartIndex = cleanTarget.lastIndexOf('(');
-				String levelText = levelStartIndex != -1 ? cleanTarget.substring(levelStartIndex) : "";
+                String baseText;
+                switch (config.displayMode()) {
+                    case LEVEL:
+                        baseText = levelText;
+                        break;
+                    case NAME:
+                        int endIndex = cleanTarget.lastIndexOf('(');
+                        baseText = endIndex != -1 ? cleanTarget.substring(0, endIndex) : cleanTarget;
+                        break;
+                    default:
+                        baseText = cleanTarget;
+                        break;
+                }
 
-				String baseText;
-				DisplayMode displayMode = config.displayMode();
-				switch (displayMode) {
-					case LEVEL:
-						baseText = levelText;
-						break;
-					case NAME:
-						int endIndex = cleanTarget.lastIndexOf('(');
-						baseText = endIndex != -1 ? cleanTarget.substring(0, endIndex) : cleanTarget;
-						break;
-					default:
-						baseText = cleanTarget;
-						break;
-				}
+                double ratio = -1;
+                if (npc.getHealthRatio() == -1)
+                {
+                    if (npcRatios.containsKey(npc))
+                    {
+                        ratio = npcRatios.get(npc);
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else if (npc.getHealthRatio() > 0) {
+                    ratio = ((double) npc.getHealthRatio() / (double) npc.getHealthScale());
+                }
+                if (ratio != -1)
+                {
+                    int splitIndex = (int) Math.round(baseText.length() * ratio);
+                    Color[] tagColors = getColorsFromTags(target);
 
-				double ratio = ((double)npc.getHealthRatio() / (double)npc.getHealthScale());
-				int splitIndex = (int)Math.round(baseText.length() * ratio);
+                    String finalText = buildFinalTargetText(cleanTarget, tagColors, splitIndex, baseText, levelText);
 
-				if (splitIndex < baseText.length())
-				{
-					Color[] tagColors = getColorsFromTags(target);
-					int monsterEndIndex = cleanTarget.lastIndexOf('(');
-					String monsterText = monsterEndIndex != -1 ? cleanTarget.substring(0, monsterEndIndex) : cleanTarget;
-					String monsterTextTagged = ColorUtil.wrapWithColorTag(monsterText, tagColors[0]);
-					String levelTextTagged = ColorUtil.wrapWithColorTag(levelText, tagColors[tagColors.length - 1]);
-					String hpText = ColorUtil.wrapWithColorTag(baseText.substring(0, splitIndex + 1), config.hpColor());
-					String bgText = ColorUtil.wrapWithColorTag(baseText.substring(splitIndex + 1), config.bgColor());
-					finalText = (baseText.contains(monsterText) ? "" : monsterTextTagged) + hpText + bgText
-							+ (baseText.contains(levelText) ? "" : levelTextTagged);
-				}
-			}
-
-			if (finalText != null)
-			{
-				MenuEntry[] menuEntries = client.getMenuEntries();
-				final MenuEntry menuEntry = menuEntries[menuEntries.length - 1];
-				menuEntry.setTarget(finalText);
-				client.setMenuEntries(menuEntries);
+                    MenuEntry[] menuEntries = client.getMenuEntries();
+                    final MenuEntry menuEntry = menuEntries[menuEntries.length - 1];
+                    menuEntry.setTarget(finalText);
+                    client.setMenuEntries(menuEntries);
+                    npcRatios.put(npc, ratio);
+                }
 			}
 		}
+	}
+
+	private String buildFinalTargetText(String target, Color[] tagColors, int splitIndex, String baseText, String levelText)
+	{
+		int monsterEndIndex = target.lastIndexOf('(');
+		String monsterText = monsterEndIndex != -1 ? target.substring(0, monsterEndIndex) : target;
+		String monsterTextTagged = ColorUtil.wrapWithColorTag(monsterText, tagColors[0]);
+		String levelTextTagged = ColorUtil.wrapWithColorTag(levelText, tagColors[tagColors.length - 1]);
+
+		String hpText = ColorUtil.wrapWithColorTag(baseText.substring(0, splitIndex), config.hpColor());
+		String bgText = ColorUtil.wrapWithColorTag(baseText.substring(splitIndex), config.bgColor());
+
+		return (baseText.contains(monsterText) ? "" : monsterTextTagged) + hpText + bgText
+				+ (baseText.contains(levelText) ? "" : levelTextTagged);
 	}
 
 	private Color[] getColorsFromTags(String text)
@@ -139,5 +172,17 @@ public class MenuHpPlugin extends Plugin
 			result = ArrayUtils.add(result, Color.decode('#' + matcher.group(1)));
 		}
 		return result;
+	}
+
+	private boolean shouldShowNpc(NPC npc)
+	{
+		String npcName = npc.getName();
+		if (npcName != null)
+		{
+			return npcNames.stream()
+					.filter(name -> !name.equalsIgnoreCase(npcName))
+					.anyMatch(name -> WildcardMatcher.matches(name, npcName));
+		}
+		return false;
 	}
 }

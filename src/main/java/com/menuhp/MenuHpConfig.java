@@ -41,4 +41,26 @@ public interface MenuHpConfig extends Config
 	{
 		return DisplayMode.LEVEL;
 	}
+
+    @ConfigItem(
+            keyName = "showOnAllNpcs",
+            name = "Show on all NPCs",
+            description = "Include an HP bar in all NPCs menu entry",
+            position = 4
+    )
+    default boolean showOnAllNpcs()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "npcsToShow",
+            name = "NPCs to show HP",
+            description = "Which NPCs will include an HP bar in their menu entry, if 'Show on all NPCs' is not selected",
+            position = 5
+    )
+    default String npcsToShow()
+    {
+        return "";
+    }
 }
