@@ -179,9 +179,7 @@ public class MenuHpPlugin extends Plugin
 		String npcName = npc.getName();
 		if (npcName != null)
 		{
-			return npcNames.stream()
-					.filter(name -> !name.equalsIgnoreCase(npcName))
-					.anyMatch(name -> WildcardMatcher.matches(name, npcName));
+			return npcNames.stream().anyMatch(name -> WildcardMatcher.matches(name, npcName));
 		}
 		return false;
 	}
