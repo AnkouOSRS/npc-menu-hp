@@ -8,6 +8,7 @@ import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.NPC;
 import net.runelite.api.events.MenuEntryAdded;
+import net.runelite.api.events.NpcDespawned;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -79,6 +80,11 @@ public class MenuHpPlugin extends Plugin
 		}
 	}
 
+	@Subscribe
+	public void onNpcDespawned(NpcDespawned event)
+	{
+		npcRatios.remove(event.getNpc());
+	}
 
 	@Subscribe
 	public void onMenuEntryAdded(MenuEntryAdded event)
@@ -124,20 +130,17 @@ public class MenuHpPlugin extends Plugin
                     {
                         ratio = npcRatios.get(npc);
                     }
-                    else
-                    {
-                        return;
-                    }
                 }
                 else if (npc.getHealthRatio() > 0) {
                     ratio = ((double) npc.getHealthRatio() / (double) npc.getHealthScale());
                 }
-                if (ratio != -1)
+                if (ratio != -1 || config.recolorWhenUnknown())
                 {
-                    int splitIndex = (int) Math.round(baseText.length() * ratio);
+                    int splitIndex = (int) Math.round(baseText.length() * Math.abs(ratio));
                     Color[] tagColors = getColorsFromTags(target);
-
-                    String finalText = buildFinalTargetText(cleanTarget, tagColors, splitIndex, baseText, levelText);
+					boolean isHealthUnknown = ratio < 0;
+                    String finalText = buildFinalTargetText(cleanTarget, tagColors, splitIndex, baseText, levelText,
+						isHealthUnknown);
 
                     MenuEntry[] menuEntries = client.getMenuEntries();
                     final MenuEntry menuEntry = menuEntries[menuEntries.length - 1];
@@ -149,14 +152,16 @@ public class MenuHpPlugin extends Plugin
 		}
 	}
 
-	private String buildFinalTargetText(String target, Color[] tagColors, int splitIndex, String baseText, String levelText)
+	private String buildFinalTargetText(String target, Color[] tagColors, int splitIndex, String baseText,
+										String levelText, boolean isHealthUnknown)
 	{
 		int monsterEndIndex = target.lastIndexOf('(');
 		String monsterText = monsterEndIndex != -1 ? target.substring(0, monsterEndIndex) : target;
 		String monsterTextTagged = ColorUtil.wrapWithColorTag(monsterText, tagColors[0]);
 		String levelTextTagged = ColorUtil.wrapWithColorTag(levelText, tagColors[tagColors.length - 1]);
 
-		String hpText = ColorUtil.wrapWithColorTag(baseText.substring(0, splitIndex), config.hpColor());
+		Color hpColor = isHealthUnknown ? config.unknownColor() : config.hpColor();
+		String hpText = ColorUtil.wrapWithColorTag(baseText.substring(0, splitIndex), hpColor);
 		String bgText = ColorUtil.wrapWithColorTag(baseText.substring(splitIndex), config.bgColor());
 
 		return (baseText.contains(monsterText) ? "" : monsterTextTagged) + hpText + bgText

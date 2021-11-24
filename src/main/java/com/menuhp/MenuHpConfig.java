@@ -32,10 +32,30 @@ public interface MenuHpConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "recolorWhenUnknown",
+		name = "Recolor when unknown",
+		description = "Recolors menu entries for monsters with unknown HP",
+		position = 3
+	)
+	default boolean recolorWhenUnknown() {
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "unknownColor",
+		name = "Unknown color",
+		description = "Color for monster menu when HP is unknown",
+		position = 4
+	)
+	default Color unknownColor() {
+		return Color.CYAN;
+	}
+
+	@ConfigItem(
 			keyName = "displayMode",
 			name = "Display mode",
 			description = "Which text to include in the HP bar",
-			position = 3
+			position = 5
 	)
 	default DisplayMode displayMode()
 	{
@@ -46,7 +66,7 @@ public interface MenuHpConfig extends Config
             keyName = "showOnAllNpcs",
             name = "Show on all NPCs",
             description = "Include an HP bar in all NPCs menu entry",
-            position = 4
+            position = 6
     )
     default boolean showOnAllNpcs()
     {
@@ -57,7 +77,7 @@ public interface MenuHpConfig extends Config
             keyName = "npcsToShow",
             name = "NPCs to show HP",
             description = "Which NPCs will include an HP bar in their menu entry, if 'Show on all NPCs' is not selected",
-            position = 5
+            position = 7
     )
     default String npcsToShow()
     {
