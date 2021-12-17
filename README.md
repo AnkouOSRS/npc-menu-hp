@@ -7,6 +7,10 @@ stacks of monsters, as it shows you which one has the most HP and thus which one
 ![Image example](https://i.imgur.com/JBwmeyE.png)
 
 ## Changelog
+ - **1.1.3**
+   - Fix dead NPCs showing the unknown color when "Recolor when unknown" is enabled. Thanks again to [equirs](https://github.com/equirs) for 
+   implementing this feature.
+   
  - **1.1.2**
    - Add the option to pick a color that will be used when the HP of the monster is unknown. Thanks to [equirs](https://github.com/equirs) for 
    implementing this feature.
