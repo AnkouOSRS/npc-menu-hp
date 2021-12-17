@@ -131,22 +131,30 @@ public class MenuHpPlugin extends Plugin
                         ratio = npcRatios.get(npc);
                     }
                 }
-                else if (npc.getHealthRatio() > 0) {
+                else if (npc.getHealthRatio() >= 0)
+                {
                     ratio = ((double) npc.getHealthRatio() / (double) npc.getHealthScale());
                 }
-                if (ratio != -1 || config.recolorWhenUnknown())
+                else if (npc.isDead())
                 {
+                    ratio = 0;
+                }
+				if (ratio != -1 || config.recolorWhenUnknown())
+				{
                     int splitIndex = (int) Math.round(baseText.length() * Math.abs(ratio));
                     Color[] tagColors = getColorsFromTags(target);
-					boolean isHealthUnknown = ratio < 0;
+                    boolean isHealthUnknown = ratio < 0;
                     String finalText = buildFinalTargetText(cleanTarget, tagColors, splitIndex, baseText, levelText,
-						isHealthUnknown);
+                        isHealthUnknown);
 
                     MenuEntry[] menuEntries = client.getMenuEntries();
                     final MenuEntry menuEntry = menuEntries[menuEntries.length - 1];
                     menuEntry.setTarget(finalText);
                     client.setMenuEntries(menuEntries);
-                    npcRatios.put(npc, ratio);
+                    if (!isHealthUnknown)
+                    {
+                        npcRatios.put(npc, ratio);
+                    }
                 }
 			}
 		}
