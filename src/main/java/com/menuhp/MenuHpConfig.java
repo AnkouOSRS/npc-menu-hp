@@ -73,11 +73,22 @@ public interface MenuHpConfig extends Config
         return true;
     }
 
+	@ConfigItem(
+		keyName = "showMonsterHpPercentage",
+		name = "Show monster HP percentage",
+		description = "Include the monster's HP percentage in its menu entry",
+		position = 7
+	)
+	default boolean showMonsterHpPercentage()
+	{
+		return false;
+	}
+
     @ConfigItem(
             keyName = "npcsToShow",
             name = "NPCs to show HP",
             description = "Which NPCs will include an HP bar in their menu entry, if 'Show on all NPCs' is not selected",
-            position = 7
+            position = 8
     )
     default String npcsToShow()
     {

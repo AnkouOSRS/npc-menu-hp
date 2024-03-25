@@ -7,6 +7,12 @@ stacks of monsters, as it shows you which one has the most HP and thus which one
 ![Image example](https://i.imgur.com/JBwmeyE.png)
 
 ## Changelog
+ - **1.1.5**
+   - Add the option to show the monster's HP percentage in the menu entry.
+
+- **1.1.4**
+   - Update MenuActions list to work with the latest update.
+   
  - **1.1.3**
    - Fix dead NPCs showing the unknown color when "Recolor when unknown" is enabled. Thanks again to [equirs](https://github.com/equirs) for 
    implementing this feature.
