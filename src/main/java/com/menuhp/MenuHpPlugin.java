@@ -145,7 +145,7 @@ public class MenuHpPlugin extends Plugin
                     Color[] tagColors = getColorsFromTags(target);
                     boolean isHealthUnknown = ratio < 0;
                     String finalText = buildFinalTargetText(cleanTarget, tagColors, splitIndex, baseText, levelText,
-                        isHealthUnknown);
+                        isHealthUnknown, ratio);
 
                     MenuEntry[] menuEntries = client.getMenuEntries();
                     final MenuEntry menuEntry = menuEntries[menuEntries.length - 1];
@@ -161,7 +161,7 @@ public class MenuHpPlugin extends Plugin
 	}
 
 	private String buildFinalTargetText(String target, Color[] tagColors, int splitIndex, String baseText,
-										String levelText, boolean isHealthUnknown)
+										String levelText, boolean isHealthUnknown, double ratio)
 	{
 		int monsterEndIndex = target.lastIndexOf('(');
 		String monsterText = monsterEndIndex != -1 ? target.substring(0, monsterEndIndex) : target;
@@ -172,8 +172,10 @@ public class MenuHpPlugin extends Plugin
 		String hpText = ColorUtil.wrapWithColorTag(baseText.substring(0, splitIndex), hpColor);
 		String bgText = ColorUtil.wrapWithColorTag(baseText.substring(splitIndex), config.bgColor());
 
+		String hpPercentage = (ratio == -1) ? "" : String.format(" - %.1f%%", ratio * 100);
+
 		return (baseText.contains(monsterText) ? "" : monsterTextTagged) + hpText + bgText
-				+ (baseText.contains(levelText) ? "" : levelTextTagged);
+				+ (baseText.contains(levelText) ? "" : levelTextTagged) + (config.showMonsterHpPercentage() ? hpPercentage : "");
 	}
 
 	private Color[] getColorsFromTags(String text)
