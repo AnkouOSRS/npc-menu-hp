@@ -3,10 +3,7 @@ package com.menuhp;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.Client;
-import net.runelite.api.MenuAction;
-import net.runelite.api.MenuEntry;
-import net.runelite.api.NPC;
+import net.runelite.api.*;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.client.config.ConfigManager;
@@ -100,7 +97,9 @@ public class MenuHpPlugin extends Plugin
 
 		if (NPC_MENU_ACTIONS.contains(menuAction))
 		{
-			NPC npc = client.getCachedNPCs()[event.getIdentifier()];
+			WorldView wv = client.getTopLevelWorldView();
+
+			NPC npc = wv.npcs().byIndex(event.getIdentifier());
 
 			if ((config.showOnAllNpcs() || shouldShowNpc(npc)))
 			{
