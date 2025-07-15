@@ -7,6 +7,9 @@ stacks of monsters, as it shows you which one has the most HP and thus which one
 ![Image example](https://i.imgur.com/JBwmeyE.png)
 
 ## Changelog
+ - **1.1.7**
+   - Add options for highlighting the menu item for the monster with the most hp.
+
  - **1.1.5**
    - Add the option to show the monster's HP percentage in the menu entry.
 
