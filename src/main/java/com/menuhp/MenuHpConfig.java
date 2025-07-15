@@ -94,4 +94,41 @@ public interface MenuHpConfig extends Config
     {
         return "";
     }
+
+	@ConfigItem(
+			keyName = "highlightHighestHpMonster",
+			name = "Highlight highest HP monster",
+			description = "Highlights the monster in the menu with the highest hp and same name with a color " +
+					"determined by \"Highest HP monster color\".",
+			position = 9
+	)
+	default boolean highlightHighestHpMonster()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "unknownHpCountsAsHighestHp",
+			name = "Unknown HP counts as highest HP",
+			description = "If a monster has unknown HP, it <i>usually</i> is because it has full health and has yet " +
+					"to be attacked. This option will include monsters with unknown hp as if they had max health for " +
+					"the purposes of \"Highlight highest HP monster\".",
+			position = 10
+	)
+	default boolean unknownHpCountsAsHighestHp()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "highestHpMonsterColor",
+			name = "Highest HP monster color",
+			description = "The HP color for the menu HP bar of the monster with the highest health and the same " +
+					"name. Only used if \"Highlight highest HP monster\" is enabled.",
+			position = 11
+	)
+	default Color highestHpMonsterColor()
+	{
+		return Color.MAGENTA;
+	}
 }

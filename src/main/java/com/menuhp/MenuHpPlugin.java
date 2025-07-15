@@ -2,9 +2,14 @@ package com.menuhp;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Provides;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.MenuEntryAdded;
+import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -84,94 +89,151 @@ public class MenuHpPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onMenuEntryAdded(MenuEntryAdded event)
+	public void onMenuOpened(MenuOpened event)
 	{
-		int type = event.getType();
+		if (!config.highlightHighestHpMonster()) return;
 
-		if (type >= MENU_ACTION_DEPRIORITIZE_OFFSET)
+		final WorldView wv = client.getTopLevelWorldView();
+
+		final Map<String, MaxHpCandidate> maxHpCandidateMap = new LinkedHashMap<>();
+		for (MenuEntry entry : event.getMenuEntries())
 		{
-			type -= MENU_ACTION_DEPRIORITIZE_OFFSET;
+			if (!validType(entry.getType().getId()))
+			{
+				continue;
+			}
+
+			final NPC npc = wv.npcs().byIndex(entry.getIdentifier());
+			double currentMonsterHpRatio = calculateNpcHealthRatio(npc);
+			if (currentMonsterHpRatio == -1d && config.unknownHpCountsAsHighestHp())
+			{
+				currentMonsterHpRatio = 1d;
+			}
+
+			if (currentMonsterHpRatio < 0d || (!config.showOnAllNpcs() && !shouldShowNpc(npc)))
+			{
+				continue;
+			}
+
+			final String target = Text.removeTags(entry.getTarget());
+			final String targetName = target.substring(0, target.lastIndexOf('('));
+
+			final MaxHpCandidate maxHpCandidate =
+					maxHpCandidateMap.computeIfAbsent(targetName, (unused) -> new MaxHpCandidate());
+			if (npc.equals(maxHpCandidate.npc))
+			{
+				maxHpCandidate.menuEntries.add(entry);
+			}
+			else if (currentMonsterHpRatio >= maxHpCandidate.getHpRatio())
+			{
+				maxHpCandidate.setNpc(npc);
+				maxHpCandidate.setHpRatio(currentMonsterHpRatio);
+				maxHpCandidate.menuEntries.clear();
+				maxHpCandidate.menuEntries.add(entry);
+			}
 		}
 
-		final MenuAction menuAction = MenuAction.of(type);
-
-		if (NPC_MENU_ACTIONS.contains(menuAction))
+		for (MaxHpCandidate maxHpCandidate : maxHpCandidateMap.values())
 		{
-			WorldView wv = client.getTopLevelWorldView();
-
-			NPC npc = wv.npcs().byIndex(event.getIdentifier());
-
-			if ((config.showOnAllNpcs() || shouldShowNpc(npc)))
+			for (MenuEntry menuEntry : maxHpCandidate.getMenuEntries())
 			{
-                String target = event.getTarget();
-                String cleanTarget = Text.removeTags(event.getTarget());
-                int levelStartIndex = cleanTarget.lastIndexOf('(');
-                String levelText = levelStartIndex != -1 ? cleanTarget.substring(levelStartIndex) : "";
-
-                String baseText;
-                switch (config.displayMode()) {
-                    case LEVEL:
-                        baseText = levelText;
-                        break;
-                    case NAME:
-                        int endIndex = cleanTarget.lastIndexOf('(');
-                        baseText = endIndex != -1 ? cleanTarget.substring(0, endIndex) : cleanTarget;
-                        break;
-                    default:
-                        baseText = cleanTarget;
-                        break;
-                }
-
-                double ratio = -1;
-                if (npc.getHealthRatio() == -1)
-                {
-                    if (npcRatios.containsKey(npc))
-                    {
-                        ratio = npcRatios.get(npc);
-                    }
-                }
-                else if (npc.getHealthRatio() >= 0)
-                {
-                    ratio = ((double) npc.getHealthRatio() / (double) npc.getHealthScale());
-                }
-                else if (npc.isDead())
-                {
-                    ratio = 0;
-                }
-				if (ratio != -1 || config.recolorWhenUnknown())
-				{
-                    int splitIndex = (int) Math.round(baseText.length() * Math.abs(ratio));
-                    Color[] tagColors = getColorsFromTags(target);
-                    boolean isHealthUnknown = ratio < 0;
-                    String finalText = buildFinalTargetText(cleanTarget, tagColors, splitIndex, baseText, levelText,
-                        isHealthUnknown, ratio);
-
-                    MenuEntry[] menuEntries = client.getMenuEntries();
-                    final MenuEntry menuEntry = menuEntries[menuEntries.length - 1];
-                    menuEntry.setTarget(finalText);
-                    client.setMenuEntries(menuEntries);
-                    if (!isHealthUnknown)
-                    {
-                        npcRatios.put(npc, ratio);
-                    }
-                }
+				final String target = menuEntry.getTarget();
+				final double hpRatio = maxHpCandidate.getHpRatio();
+				final boolean isUnknownHp = calculateNpcHealthRatio(maxHpCandidate.npc) < 0d;
+				final Color maxHpColor = config.highestHpMonsterColor();
+				colorMenuEntry(menuEntry, target, maxHpColor, hpRatio, isUnknownHp);
 			}
 		}
 	}
 
-	private String buildFinalTargetText(String target, Color[] tagColors, int splitIndex, String baseText,
-										String levelText, boolean isHealthUnknown, double ratio)
+	@Subscribe
+	public void onMenuEntryAdded(MenuEntryAdded event) {
+	if (validType(event.getType()))
+		{
+			final WorldView wv = client.getTopLevelWorldView();
+			final NPC npc = wv.npcs().byIndex(event.getIdentifier());
+			if ((config.showOnAllNpcs() || shouldShowNpc(npc)))
+			{
+				final double hpRatio = calculateNpcHealthRatio(npc);
+				final boolean isUnknownHp = hpRatio < 0;
+				final Color hpColor = isUnknownHp ? config.unknownColor() : config.hpColor();
+				colorMenuEntry(event.getMenuEntry(), event.getTarget(), hpColor, hpRatio, isUnknownHp);
+			}
+		}
+	}
+
+	private double calculateNpcHealthRatio(NPC npc) {
+		double ratio = -1d;
+
+		if (npc.getHealthRatio() == -1)
+		{
+			ratio = npcRatios.getOrDefault(npc, -1d);
+		}
+		else if (npc.getHealthRatio() >= 0)
+		{
+			ratio = ((double) npc.getHealthRatio() / (double) npc.getHealthScale());
+		}
+		else if (npc.isDead())
+		{
+			ratio = 0;
+		}
+
+		npcRatios.put(npc, ratio);
+		return ratio;
+	}
+
+	private void colorMenuEntry(MenuEntry menuEntry, String target, Color hpColor, double hpRatio, boolean isUnknownHp)
+	{
+		String cleanTarget = Text.removeTags(target);
+		int levelStartIndex = cleanTarget.lastIndexOf('(');
+		int levelEndIndex = cleanTarget.lastIndexOf(')');
+		String levelText = levelStartIndex != -1 && levelEndIndex != -1
+				? cleanTarget.substring(levelStartIndex, levelEndIndex + 1) : "";
+
+		String baseText;
+		switch (config.displayMode()) {
+			case LEVEL:
+				baseText = levelText;
+				break;
+			case NAME:
+				baseText = levelStartIndex != -1 ? cleanTarget.substring(0, levelStartIndex) : cleanTarget;
+				break;
+			default:
+				baseText = levelEndIndex != -1 ? cleanTarget.substring(0, levelEndIndex + 1) : cleanTarget;
+				break;
+		}
+
+		if (hpRatio != -1d || config.recolorWhenUnknown())
+		{
+			int splitIndex = (int) Math.round(baseText.length() * Math.abs(hpRatio));
+			Color[] tagColors = getColorsFromTags(target);
+			String finalText = buildFinalTargetText(cleanTarget, tagColors, hpColor, splitIndex, baseText, levelText,
+					hpRatio, isUnknownHp);
+
+			menuEntry.setTarget(finalText);
+		}
+	}
+
+    private boolean validType(int typeId) {
+        if (typeId >= MENU_ACTION_DEPRIORITIZE_OFFSET) typeId -= MENU_ACTION_DEPRIORITIZE_OFFSET;
+        final MenuAction menuAction = MenuAction.of(typeId);
+        return NPC_MENU_ACTIONS.contains(menuAction);
+    }
+
+	// `isUnknownHp` is not derived from `ratio` because the "treat unknown hp as max hp" logic
+	// will force the ratio to 1.0 when it is truly unknown for the purpose of coloring the text.
+	private String buildFinalTargetText(String target, Color[] tagColors, Color hpColor, int splitIndex,
+										String baseText, String levelText, double ratio, boolean isUnknownHp)
 	{
 		int monsterEndIndex = target.lastIndexOf('(');
 		String monsterText = monsterEndIndex != -1 ? target.substring(0, monsterEndIndex) : target;
 		String monsterTextTagged = ColorUtil.wrapWithColorTag(monsterText, tagColors[0]);
 		String levelTextTagged = ColorUtil.wrapWithColorTag(levelText, tagColors[tagColors.length - 1]);
 
-		Color hpColor = isHealthUnknown ? config.unknownColor() : config.hpColor();
 		String hpText = ColorUtil.wrapWithColorTag(baseText.substring(0, splitIndex), hpColor);
 		String bgText = ColorUtil.wrapWithColorTag(baseText.substring(splitIndex), config.bgColor());
 
-		String hpPercentage = (ratio == -1) ? "" : String.format(" - %.1f%%", ratio * 100);
+		String hpPercentage = isUnknownHp ? "" : String.format(" - %.1f%%", ratio * 100);
 
 		return (baseText.contains(monsterText) ? "" : monsterTextTagged) + hpText + bgText
 				+ (baseText.contains(levelText) ? "" : levelTextTagged) + (config.showMonsterHpPercentage() ? hpPercentage : "");
@@ -196,5 +258,15 @@ public class MenuHpPlugin extends Plugin
 			return npcNames.stream().anyMatch(name -> WildcardMatcher.matches(name, npcName));
 		}
 		return false;
+	}
+
+	@Getter
+	@Setter
+	@NoArgsConstructor
+	@ToString
+	private static class MaxHpCandidate {
+		private double hpRatio = -1d;
+		private NPC npc = null;
+		private final List<MenuEntry> menuEntries = new ArrayList<>();
 	}
 }
