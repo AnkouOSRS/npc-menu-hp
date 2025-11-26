@@ -7,6 +7,12 @@ stacks of monsters, as it shows you which one has the most HP and thus which one
 ![Image example](https://i.imgur.com/JBwmeyE.png)
 
 ## Changelog
+ - **1.1.7**
+   - Fix NullPointerException caused by, for example, hovering over the helm of a ship.
+
+ - **1.1.6**
+   - Remove reference to deprecated getCachedNPCs method.
+
  - **1.1.5**
    - Add the option to show the monster's HP percentage in the menu entry.
 
